@@ -151,9 +151,8 @@ class PageLoadTestCase(AbstractSeleniumTestCase):
 
 class PartialResponseSubmissionTestCase(AbstractSeleniumTestCase):
     """Partially completes a response, then starts a new one. The incomplete
-    response should be uploaded to the db.
-
-    Random stopping point? Or test all?"""
+    response should be uploaded to the db. Correctness is assumed (from unit
+    tests and PageLoadTestCase)"""
 
     def flow(self):
         """Runs through the page, fills out responses but does NOT submit"""
