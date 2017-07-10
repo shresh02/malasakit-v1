@@ -147,3 +147,49 @@ class PageLoadTestCase(AbstractSeleniumTestCase):
         self.personal_info()
         self.check_script_and_local_storage()
         self.submission()
+
+
+class PartialResponseSubmissionTestCase(AbstractSeleniumTestCase):
+    """Partially completes a response, then starts a new one. The incomplete
+    response should be uploaded to the db.
+
+    Random stopping point? Or test all?"""
+
+    def flow(self):
+        """Runs through the page, fills out responses but does NOT submit"""
+        self.assertIn(reverse('pcari:landing'), self.driver.current_url)
+        self.driver.find_element_by_id('next').click()
+
+        self.assertIn(reverse('pcari:quantitative-questions'), self.driver.current_url)
+        self.inputs['quantitative-questions'] = \
+                            self.driver.quant_questions_random_responses()
+
+        self.assertIn(reverse('pcari:rate-comments'), self.driver.current_url)
+        self.inputs['rate-comments'] = \
+                            self.driver.rate_comments_random_responses()
+        self.driver.find_element_by_id('next').click()
+
+        self.assertIn(reverse('pcari:qualitative-questions'), self.driver.current_url)
+        self.inputs['qualitative-questions'] = \
+                                self.driver.qual_questions_random_responses()
+        self.driver.find_element_by_id('next').click()
+
+        self.assertIn(reverse('pcari:personal-information'), self.driver.current_url)
+        self.driver.get("%s%s" % (self.live_server_url,
+                                  reverse('pcari:personal-information')))
+        self.inputs['personal-info'] = self.driver.personal_info_random_responses()
+
+    @AbstractSeleniumTestCase.dump_driver_log_on_error
+    def test_partial_response(self):
+        self.flow()
+        # fill out all responses
+        before = Respondent.objects.count()
+        # clear log
+        self.driver.get_log('browser')
+        self.driver.get("%s%s" % (self.live_server_url,
+                                  reverse("pcari:landing")))
+        self.driver.find_element_by_id('next').click()
+        time.sleep(0.5) # give the server time to receive the response and add to db
+
+        after = Respondent.objects.count()
+        self.assertEqual(Respondent.objects.count(), before + 1)
