@@ -30,6 +30,8 @@ import time
 from .models import Comment, Respondent, QuantitativeQuestion
 
 
+# TODO: Address issue of comment bubbles not being clickable
+
 
 class PageLoadTestCase(AbstractSeleniumTestCase):
     """Clickthrough test case, checks for page functionality and LocalStorage
