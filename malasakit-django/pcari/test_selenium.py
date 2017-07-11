@@ -27,7 +27,7 @@ from django.urls import reverse
 
 from pcari.selenium_utilities import AbstractSeleniumTestCase
 import time
-from .models import Respondent
+from .models import Comment, Respondent, QuantitativeQuestion
 
 
 
@@ -192,3 +192,83 @@ class PartialResponseSubmissionTestCase(AbstractSeleniumTestCase):
 
         after = Respondent.objects.count()
         self.assertEqual(Respondent.objects.count(), before + 1)
+
+
+
+class LanguageChangeTestCase(AbstractSeleniumTestCase):
+    """Fills out responses, then accesses them again in both EN and TL, checking if
+    they are preserved."""
+
+    languages = ['tl', 'en']
+
+    def flow(self):
+        """Runs through the page, fills out responses but does NOT submit"""
+        self.assertIn(reverse('pcari:landing'), self.driver.current_url)
+        self.driver.find_element_by_id('next').click()
+
+        self.assertIn(reverse('pcari:quantitative-questions'), self.driver.current_url)
+        self.inputs['quantitative-questions'] = \
+                            self.driver.quant_questions_random_responses()
+
+        self.assertIn(reverse('pcari:rate-comments'), self.driver.current_url)
+        self.inputs['rate-comments'] = \
+                            self.driver.rate_comments_random_responses()
+        self.driver.find_element_by_id('next').click()
+
+        self.assertIn(reverse('pcari:qualitative-questions'), self.driver.current_url)
+        self.inputs['qualitative-questions'] = \
+                                self.driver.qual_questions_random_responses()
+        self.driver.find_element_by_id('next').click()
+
+        self.assertIn(reverse('pcari:personal-information'), self.driver.current_url)
+        self.driver.get("%s%s" % (self.live_server_url,
+                                  reverse('pcari:personal-information')))
+        self.inputs['personal-info'] = self.driver.personal_info_random_responses()
+
+    @AbstractSeleniumTestCase.dump_driver_log_on_error
+    def test_quant_question_change(self):
+        """Accesses quantitative questions field in EN and TL, checks if responses
+        are the same."""
+        self.flow()
+        # number of clicks = num_questions - 1
+        num_questions = QuantitativeQuestion.objects.count()
+        for code in self.languages:
+            scores = []
+            self.driver.get("%s/%s/quantitative-questions/" % (self.live_server_url, code))
+            for i in range(num_questions):
+                slider = self.driver.find_element_by_css_selector('input[type=range]')
+                score = int(slider.get_attribute('value'))
+                # If skip message is shown, then the user skipped
+                if self.driver.find_element_by_id("skip-notice").get_attribute("style") \
+                   == "display: block;":
+                    scores.append(-1)
+                else:
+                    scores.append(score)
+                self.driver.find_element_by_id("previous").click()
+            # remember, we're still recording score histories
+            scores.reverse() # mutate the list, because we went backwards and want to flip
+            self.assertListEqual(scores, [lst[-1] for lst in self.inputs['quantitative-questions']])
+
+    @AbstractSeleniumTestCase.dump_driver_log_on_error
+    def test_rate_comment_change(self):
+        """Checks the rate comment view and makes sure the number of remaining comments
+        is correct"""
+        self.flow()
+        expected_remaining = Comment.objects.count() - len(self.inputs['rate-comments'])
+
+        for code in self.languages:
+            self.driver.get("%s/%s/rate-comments/" % (self.live_server_url, code))
+            client_remaining = len(self.driver.find_elements_by_tag_name('image'))
+            self.assertEqual(client_remaining, expected_remaining)
+
+    @AbstractSeleniumTestCase.dump_driver_log_on_error
+    def test_qual_question_change(self):
+        self.flow()
+        expected_comments = self.inputs['qualitative-questions'].values() # list of comments
+
+        for code in self.languages:
+            self.driver.get("%s/%s/qualitative-questions/" % (self.live_server_url, code))
+            self.driver.get_screenshot_as_file("qual-q-%s" % code)
+            text_boxes = self.driver.find_elements_by_tag_name("textarea")
+            client_comments = [box.get_attribute("value") for box in text_boxes]
+            self.assertListEqual(client_comments, expected_comments)
