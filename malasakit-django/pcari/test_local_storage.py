@@ -122,3 +122,27 @@ class PageUpdateTestCase(AbstractSeleniumTestCase):
     def tearDown(self):
         """Teardown steps: run regardless of test success or failure"""
         os.rename('pcari/templates/base-temp.html', 'pcari/templates/base.html')
+
+
+class refreshResourcesTestCase(AbstractSeleniumTestCase):
+    """Tests if heavy resources (location data and comments) refresh after 12 hours.
+    Spoofs time on the client. Checks for browser console log output indicating
+    successful loading of location data and comments- do NOT change these!"""
+
+    def test_refresh_resources(self):
+        """Spoofs time by rewriting getCurrentTimestamp on the client, then
+        refreshing resources. Checks log for indication that location data and
+        comments were reloaded."""
+        # go to first page
+        self.driver.find_element_by_id('next').click()
+        self.driver.get_log('browser') # purge log
+
+        self.driver.execute_script("""getCurrentTimestamp = function() {
+            return new Date().getTime() + 13*60*60*1000;
+        } """)
+
+        self.driver.execute_script("refreshResources()")
+        time.sleep(0.5)
+        log = self.driver.get_log("browser")
+        self.assertTrue(any('location-data' in l['message'] for l in log))
+        self.assertTrue(any('comments' in l['message'] for l in log))
