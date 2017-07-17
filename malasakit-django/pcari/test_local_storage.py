@@ -152,14 +152,18 @@ class OfflineTestCase(AbstractSeleniumTestCase):
     """Tests offline functionality. Starts live server, has browser access,
     kills, flows through app, then restarts server to submit responses"""
 
-    def test_kill_restart_server(self):
-        """Kills and restarts the server"""
+    def setUp(self):
+        """Override setUp, it's navigated to landing, now kill the server."""
+        super(OfflineTestCase, self).setUp()
         time.sleep(1)
         self.driver.print_log(self.driver.get_log('browser'))
         print self.live_server_url
         print "Tearing down server"
         self.tearDownClass()
         time.sleep(10)
+
+    def test_kill_restart_server(self):
+        """Kills and restarts the server"""
 
         self.driver.get("%s%s" % (self.live_server_url, reverse("pcari:landing")))
         time.sleep(1)
