@@ -1,6 +1,7 @@
 
 from django.urls import reverse
 
+import json
 import os
 
 from pcari.selenium_utilities import AbstractSeleniumTestCase
@@ -192,12 +193,18 @@ class OfflineTestCase(AbstractSeleniumTestCase):
         self.flow()
         self.driver.print_log(self.driver.get_log('browser'))
         print self.driver.local_storage.keys()
+        ls = self.driver.local_storage
 
         print "Starting up new server"
         self.setUpClass()
 
         print "Does starting the server send in the response?"
         self.driver.get("%s%s" % (self.live_server_url, reverse("pcari:landing")))
+        for k in ls.keys():
+            val = json.dumps(ls[k])
+            self.driver.execute_script(
+                """localStorage.setItem('%s', JSON.stringify(%s))""" % (k, json.dumps(ls[k]))
+            )
+
         self.driver.print_log(self.driver.get_log('browser'))
         self.driver.find_element_by_id('next').click()
-        print self.driver.local_storage.keys()
