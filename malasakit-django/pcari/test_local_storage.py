@@ -180,9 +180,9 @@ class OfflineTestCase(AbstractSeleniumTestCase):
 
     def test_kill_restart_server(self):
         """Kills and restarts the server"""
+        before = Respondent.objects.count()
 
         self.driver.get("%s%s" % (self.live_server_url, reverse('pcari:landing')))
-        self.driver.print_log(self.driver.get_log('browser'))
         print self.live_server_url
         time.sleep(self.TIMEOUT)
 
@@ -191,12 +191,15 @@ class OfflineTestCase(AbstractSeleniumTestCase):
         self.driver.get("%s%s" % (self.live_server_url, reverse("pcari:landing")))
 
         self.flow()
-        self.driver.print_log(self.driver.get_log('browser'))
-        print self.driver.local_storage.keys()
         ls = self.driver.local_storage
 
         print "Starting up new server"
         self.setUpClass()
+        time.sleep(self.TIMEOUT)
+
+        print Respondent.objects.all()
+        print Comment.objects.all()
+
 
         print "Does starting the server send in the response?"
         self.driver.get("%s%s" % (self.live_server_url, reverse("pcari:landing")))
@@ -205,6 +208,9 @@ class OfflineTestCase(AbstractSeleniumTestCase):
             self.driver.execute_script(
                 """localStorage.setItem('%s', JSON.stringify(%s))""" % (k, json.dumps(ls[k]))
             )
+        ls = self.driver.local_storage
 
-        self.driver.print_log(self.driver.get_log('browser'))
+        print ls[ls['current']['data']]
         self.driver.find_element_by_id('next').click()
+
+        self.assertEqual(Respondent.objects.count(), before + 1)
