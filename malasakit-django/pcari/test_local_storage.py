@@ -178,12 +178,12 @@ class OfflineTestCase(AbstractSeleniumTestCase):
                                   reverse('pcari:personal-information')))
         self.inputs['personal-info'] = self.driver.personal_info_random_responses()
 
-    def test_kill_restart_server(self):
-        """Kills and restarts the server"""
-        before = Respondent.objects.count()
+    def test_kill_server_flow(self):
+        """Tests ServiceWorker registration, by having client click through
+        the app offline. If any assets are missing the test will fail, indicating
+        resources are not properly cached."""
 
         self.driver.get("%s%s" % (self.live_server_url, reverse('pcari:landing')))
-        print self.live_server_url
         time.sleep(self.TIMEOUT)
 
         print "Tearing down server"
@@ -191,26 +191,46 @@ class OfflineTestCase(AbstractSeleniumTestCase):
         self.driver.get("%s%s" % (self.live_server_url, reverse("pcari:landing")))
 
         self.flow()
-        ls = self.driver.local_storage
 
-        print "Starting up new server"
-        self.setUpClass()
-        time.sleep(self.TIMEOUT)
-
-        print Respondent.objects.all()
-        print Comment.objects.all()
-
-
-        print "Does starting the server send in the response?"
-        self.driver.get("%s%s" % (self.live_server_url, reverse("pcari:landing")))
-        for k in ls.keys():
-            val = json.dumps(ls[k])
-            self.driver.execute_script(
-                """localStorage.setItem('%s', JSON.stringify(%s))""" % (k, json.dumps(ls[k]))
-            )
-        ls = self.driver.local_storage
-
-        print ls[ls['current']['data']]
         self.driver.find_element_by_id('next').click()
+        self.driver.find_element_by_id('submit').click()
 
-        self.assertEqual(Respondent.objects.count(), before + 1)
+        # Not going to check localStorage correctness because it is covered in other tests.
+
+
+    # def test_kill_restart_server(self):
+    #     """Kills and restarts the server"""
+    #     before = Respondent.objects.count()
+
+    #     self.driver.get("%s%s" % (self.live_server_url, reverse('pcari:landing')))
+    #     print self.live_server_url
+    #     time.sleep(self.TIMEOUT)
+
+    #     print "Tearing down server"
+    #     self.tearDownClass()
+    #     self.driver.get("%s%s" % (self.live_server_url, reverse("pcari:landing")))
+
+    #     self.flow()
+    #     ls = self.driver.local_storage
+
+    #     print "Starting up new server"
+    #     self.setUpClass()
+    #     time.sleep(self.TIMEOUT)
+
+    #     print Respondent.objects.all()
+    #     print Comment.objects.all()
+
+
+    #     print "Does starting the server send in the response?"
+    #     self.driver.get("%s%s" % (self.live_server_url, reverse("pcari:landing")))
+    #     for k in ls.keys():
+    #         val = json.dumps(ls[k])
+    #         self.driver.execute_script(
+    #             """localStorage.setItem('%s', JSON.stringify(%s))""" % (k, json.dumps(ls[k]))
+    #         )
+    #     ls = self.driver.local_storage
+
+    #     print ls[ls['current']['data']]
+    #     self.driver.find_element_by_id('next').click()
+
+    #     self.assertEqual(Respondent.objects.count(), before + 1)
