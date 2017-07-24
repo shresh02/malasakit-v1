@@ -16,6 +16,7 @@ References:
 
 from __future__ import unicode_literals
 import datetime
+import itertools
 import logging
 import json
 import math
@@ -484,52 +485,40 @@ def save_response(request):
 
 
 @profile
-def export_csv(stream, queryset):
+def export_csv(stream, rows, **_):
     """
-    Export the given ``QuerySet`` as comma-separated values to a stream.
+    Export the given rows as comma-separated values.
 
     Args:
         stream: A ``file``-like object with a ``write`` method.
-        queryset: A Django ``QuerySet`` of instances to export.
+        rows: An iterable of lists, each of which represents a row to write.
+            All cell values are coerced to ``unicode`` strings before being
+            written.
 
-    Returns:
-        `None`. Has a side effect of writing to the ``stream``.
+    Has a side effect of writing to the ``stream``.
     """
-    concrete_fields = get_concrete_fields(queryset.model)
-    field_names = [unicode(field.get_attname()) for field in concrete_fields]
-
     writer = csv.writer(stream, encoding='utf-8')
-    writer.writerow(field_names)
-
-    for instance in queryset.iterator():
-        row = [getattr(instance, field_name) for field_name in field_names]
-        row = [unicode(cell) if cell is not None else '' for cell in row]
-        writer.writerow(row)
+    for row in rows:
+        writer.writerow([(unicode(cell) if cell is not None else '')
+                         for cell in row])
 
 
 @profile
-def export_excel(stream, queryset):
+def export_excel(stream, rows, sheet_title='(Unnamed worksheet)'):
     """
-    Export the given ``QuerySet`` as an Excel spreadsheet.
+    Export the given rows as an Excel spreadsheet with one worksheet.
 
     Args:
         stream: A ``file``-like object with a ``write`` method.
-        queryset: A Django ``QuerySet`` of instances to export.
+        rows: An iterable of lists, each of which represents a row to write.
+        sheet_title (str): The title of the worksheet to write to.
 
-    Returns:
-        `None`. Has a side effect of writing to the ``stream``.
+    Has a side effect of writing to the ``stream``.
     """
-    concrete_fields = get_concrete_fields(queryset.model)
-    field_names = [unicode(field.get_attname()) for field in concrete_fields]
-
     workbook = Workbook(write_only=True)
-    worksheet = workbook.create_sheet(queryset.model.__name__)
-    worksheet.append(field_names)
-
-    for instance in queryset.iterator():
-        row = [getattr(instance, field_name) for field_name in field_names]
+    worksheet = workbook.create_sheet(sheet_title)
+    for row in rows:
         worksheet.append(row)
-
     workbook.save(stream)
 
 
@@ -566,9 +555,15 @@ def export_data(queryset, data_format='csv'):
     filename = generate_export_filename(model_name, data_format)
     content_type, _ = mimetypes.guess_type(filename)
 
+    concrete_fields = get_concrete_fields(queryset.model)
+    field_names = [unicode(field.get_attname()) for field in concrete_fields]
+    cells = ([getattr(instance, field_name) for field_name in field_names]
+             for instance in queryset.iterator())
+    rows = itertools.chain([field_names], cells)
+
     response = HttpResponse(content_type=content_type)
     response['Content-Disposition'] = 'attachment; filename="{0}"'.format(filename)
-    export(response, queryset)
+    export(response, rows, sheet_title=model_name)
     return response
 
 
